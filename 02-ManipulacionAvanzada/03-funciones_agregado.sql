@@ -407,3 +407,9 @@ GROUP BY c.CategoryID,
 		 p.ProductName
 HAVING SUM(p.UnitsInStock) < 200
 ORDER BY CategoryName DESC, P.ProductName ASC;
+
+
+SELECT *
+FROM Products AS p
+FULL JOIN Categories AS c
+ON c.CategoryID = p.CategoryID;

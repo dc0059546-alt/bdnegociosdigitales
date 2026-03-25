@@ -180,3 +180,45 @@ FROM categoria;
 SELECT *
 FROM Producto;
 
+--Mostrar el nombre del cliente y la fecha de su pedido
+SELECT o.CustomerID, o.OrderID, c.CompanyName 
+FROM Orders AS o
+INNER JOIN Customers AS c
+ON o.CustomerID = c.CustomerID;
+
+--Mostrar los pedidos con el nombre del empleado que los atendió
+SELECT OrderID, CONCAT(FirstName,' ', LastName) AS [Empleado]
+FROM Orders AS o
+INNER JOIN Employees AS e
+ON o.EmployeeID = e.EmployeeID
+
+--Mostrar los productos con el nombre de su proveedor
+SELECT p.ProductID, s.CompanyName, p.UnitPrice
+FROM Products AS p
+INNER JOIN Suppliers AS s
+ON p.SupplierID = s.SupplierID
+
+--Mostrar el cliente, el número de pedido y el empleado que atendió el pedido
+SELECT CompanyName, OrderID, CONCAT(FirstName,' ', LastName) AS [Empleado]
+FROM Customers AS c
+INNER JOIN Orders as o
+ON c.CustomerID = o.CustomerID
+INNER JOIN Employees AS e
+ON o.EmployeeID = e.EmployeeID
+
+--Mostrar el nombre del producto y la categoría a la que pertenece
+SELECT p.ProductName, p.CategoryID, p.UnitPrice
+FROM Products AS p
+INNER JOIN Categories AS c
+ON p.CategoryID = c.CategoryID
+--Mostrar cliente, producto y cantidad comprada
+--Mostrar el empleado y cuántos pedidos ha realizado (usar GROUP BY)
+SELECT CONCAT(FirstName, ' ', LastName) AS [Empleado], COUNT(OrderID) AS [Numero de pedidos]
+FROM Employees AS e
+INNER JOIN Orders AS o
+ON e.EmployeeID = o.EmployeeID
+GROUP BY CONCAT(FirstName, ' ', LastName);
+--Mostrar el producto, categoría y proveedor
+
+--Mostrar: Cliente Número de pedido Producto Cantidad Precio
+

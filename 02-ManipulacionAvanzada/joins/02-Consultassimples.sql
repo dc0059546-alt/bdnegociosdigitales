@@ -331,3 +331,57 @@ SELECT
 FROM Customers
 WHERE Country IN ('USA', 'CANADA') 
 and CompanyName LIKE 'b%';
+
+--Mostrar los clientes mayores de 25 años.
+SELECT CustomerID
+FROM Customers;
+
+--Mostrar los clientes que viven en Mexico.
+SELECT CustomerID, Country
+FROM Customers
+WHERE Country IN ('Mexico');
+
+SELECT CustomerID, Country
+FROM Customers
+WHERE Country = 'Mexico';
+
+--Mostrar los clientes con crédito mayor a 5000.
+SELECT *
+FROM Customers;
+
+--Mostrar los clientes que NO viven en Mexico.
+
+SELECT Country
+FROM Customers
+WHERE NOT Country = 'Mexico';
+
+SELECT Country
+FROM Customers
+WHERE Country <> 'Mexico';
+
+--Mostrar productos con precio mayor a 20 y menos de 50.
+SELECT	ProductID, UnitPrice
+FROM Products
+WHERE UnitPrice > 20 and UnitPrice < 50;
+
+--Mostrar clientes que viven en France o Spain.
+Select  *
+From Customers
+WHERE Country in ('France', 'Spain');
+
+--Mostrar empleados que NO viven en USA.
+Select  *
+From Employees
+WHERE Country <> 'USA';
+
+--Mostrar productos con stock mayor a 10 y precio mayor a 15.
+
+SELECT *
+FROM Products
+WHERE UnitsInStock > 10 and UnitsInStock < 15;
+
+-- Mostrar pedidos ordenados por OrderDate descendente.
+SELECT *
+FROM Orders
+ORDER BY OrderDate DESC;
+

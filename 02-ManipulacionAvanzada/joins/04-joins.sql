@@ -222,3 +222,5 @@ GROUP BY CONCAT(FirstName, ' ', LastName);
 
 --Mostrar: Cliente Número de pedido Producto Cantidad Precio
 
+Select * from Customers;
+

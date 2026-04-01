@@ -302,4 +302,13 @@ delete FROM TblVenta WHERE id_Venta = 11251;
 SELECT id_Cliente FROM CatCliente;
 SELECT * FROM CatProducto;
 ```
+
+
+Crear un store que permita agregar n productos, 
+Cambian los parametros 
+
+tabla tipo type, enviaar como parametro al store 
+parametros: id_cliente, cantidad a vender, tabla type
+
+
     

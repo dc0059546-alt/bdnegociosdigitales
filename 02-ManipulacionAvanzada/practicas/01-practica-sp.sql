@@ -60,10 +60,10 @@ CREATE TABLE bdPracticas.dbo.TblVenta
 
     CONSTRAINT FK_Venta_Cliente
     FOREIGN KEY (id_Cliente)
-    REFERENCES CatCliente(id_Cliente)
+    REFERENCES bdPracticas.dbo.CatCliente(id_Cliente)
 );
 
-SELECT * FROM TblVenta;
+SELECT * FROM bdPracticas.dbo.TblVenta;
 GO
 
 SELECT CustomerID
@@ -136,77 +136,233 @@ CREATE OR ALTER PROC usp_agregar_venta
 AS
 BEGIN
     DECLARE @FechaActual DATE;
-    DECLARE @ExistenciaFinal INT;
+    DECLARE @Existencia INT;
     DECLARE @Precio MONEY;
     DECLARE @id_Venta INT;
     DECLARE @Precio_Venta MONEY;
-    Begin TRY
-        SELECT id_Cliente  FROM bdPracticas.dbo.CatCliente WHERE id_Cliente = @id_Cliente;
-    End TRY
-    BEGIN CATCH
-        PRINT 'No se encontro el usuario';
-        THROW;
-    END CATCH
-    BEGIN TRY
-        SELECT @ExistenciaFinal = Existencia, 
-        @Precio = Precio FROM bdPracticas.dbo.CatProducto WHERE id_Producto =@id_Producto;
-        IF(@ExistenciaFinal >= @Cantidad_Vendida)
-            BEGIN
-                SET @ExistenciaFinal = @ExistenciaFinal - @Cantidad_Vendida;
-            END
-        ELSE
-            BEGIN
-                PRINT 'No hay mas existencias';
-                RETURN;
-            END
-    END TRY
-    BEGIN CATCH
-        PRINT 'El producto no existe ';
-        THROW;
-    END CATCH
-    BEGIN TRY
-        BEGIN TRANSACTION;
-            SET @FechaActual = CAST(GETDATE() AS date)
-            UPDATE bdPracticas.dbo.CatProducto
-            SET Existencia = @ExistenciaFinal
-            WHERE id_Producto = @id_Producto;
 
-            INSERT INTO bdPracticas.dbo.TblVenta (Fecha, id_Cliente)
-            VALUES(@FechaActual, @id_Cliente);
-            SELECT @id_Venta = id_Venta FROM bdPracticas.dbo.TblVenta WHERE Fecha = @FechaActual AND id_Cliente = @id_Cliente;
-            SELECT @Precio_Venta = @Precio * @Cantidad_Vendida;
-            INSERT INTO bdPracticas.dbo.TblDetalleVenta (id_Venta, id_Producto, precio_Venta, Cantidad_Vendida)
-            VALUES(@id_Venta, @id_Producto, @Precio_Venta, @Cantidad_Vendida);
-        COMMIT TRANSACTION;
-        PRINT 'Venta Realizada'
+    BEGIN TRY
+        BEGIN TRANSACTION
+
+        -- Validar cliente
+        IF NOT EXISTS (
+            SELECT 1 
+            FROM bdPracticas.dbo.CatCliente 
+            WHERE id_Cliente = @id_Cliente
+        )
+        BEGIN
+            PRINT 'El cliente no existe';
+            ROLLBACK
+            RETURN;
+        END
+
+        -- Obtener producto
+        SELECT @Existencia = Existencia, 
+               @Precio = Precio
+        FROM bdPracticas.dbo.CatProducto 
+        WHERE id_Producto = @id_Producto;
+
+        -- Validar producto
+        IF @Existencia IS NULL
+        BEGIN
+            PRINT 'El producto no existe';
+            ROLLBACK
+            RETURN;
+        END
+
+        -- Validar stock
+        IF @Existencia < @Cantidad_Vendida
+        BEGIN
+            PRINT 'No hay suficiente stock';
+            ROLLBACK
+            RETURN;
+        END
+
+        -- Actualizar stock
+        UPDATE bdPracticas.dbo.CatProducto
+        SET Existencia = Existencia - @Cantidad_Vendida
+        WHERE id_Producto = @id_Producto;
+
+        -- Insertar venta
+        SET @FechaActual = GETDATE();
+
+        INSERT INTO bdPracticas.dbo.TblVenta (Fecha, id_Cliente)
+        VALUES (@FechaActual, @id_Cliente);
+
+        -- Obtener ID correcto
+        SET @id_Venta = SCOPE_IDENTITY();
+
+        -- Calcular precio
+        SET @Precio_Venta = @Precio * @Cantidad_Vendida;
+
+        -- Insertar detalle
+        INSERT INTO bdPracticas.dbo.TblDetalleVenta 
+        (id_Venta, id_Producto, precio_Venta, Cantidad_Vendida)
+        VALUES (@id_Venta, @id_Producto, @Precio_Venta, @Cantidad_Vendida);
+
+        COMMIT
+        PRINT 'Venta realizada correctamente'
+
     END TRY
+
     BEGIN CATCH
         IF @@TRANCOUNT > 0
-        ROLLBACK TRANSACTION;
-        PRINT  'ERROR al hacer la venta ';
+            ROLLBACK
+
+        PRINT 'Error en la venta'
     END CATCH
 END;
 GO
 
 -- Ejecucion
 EXEC usp_agregar_venta 
-    @id_Cliente = 'ALFKI',
-    @id_Producto = 1,
-    @Cantidad_Vendida = 2;
+    @id_Cliente = 'VINET',
+    @id_Producto = 8,
+    @Cantidad_Vendida = 1;
 
 --Consultas
-SELECT * FROM CatProducto
+SELECT * FROM bdPracticas.dbo.CatProducto
 WHERE id_Producto = 1;
 
-SELECT * FROM TblVenta
+SELECT * FROM bdPracticas.dbo.TblVenta
 WHERE id_Cliente = 'ALFKI';
 
-SELECT * FROM TblDetalleVenta
+SELECT * FROM bdPracticas.dbo.TblDetalleVenta
 WHERE id_Venta = 11250;
 
 --Delete Detalle venta y TblVenta
-delete FROM TblDetalleVenta WHERE id_Venta = 11251;
-delete FROM TblVenta WHERE id_Venta = 11251;
+delete FROM bdPracticas.dbo.TblDetalleVenta WHERE id_Venta = 11251;
+delete FROM bdPracticas.dbo.TblVenta WHERE id_Venta = 11251;
 
-SELECT id_Cliente FROM CatCliente;
-SELECT * FROM CatProducto;
+SELECT id_Cliente FROM bdPracticas.dbo.CatCliente;
+SELECT * FROM bdPracticas.dbo.CatProducto;
+GO
+
+
+
+--- Tabla tipo Type 
+
+CREATE TYPE Agregar_n_producto AS TABLE
+(
+    id_Producto INT,
+    Cantidad_Vendida INT
+);
+GO
+
+
+-- Store con la tabla type
+
+CREATE OR ALTER PROC usp_agregar_venta_multiple
+@id_Cliente NCHAR(5),
+@Detalle Agregar_n_producto READONLY
+AS
+BEGIN
+    DECLARE @id_Venta INT;
+    DECLARE @FechaActual DATE = CAST(GETDATE() AS DATE);
+
+    BEGIN TRY
+
+        --  1. Validar cliente
+        IF NOT EXISTS (
+            SELECT 1 
+            FROM bdPracticas.dbo.CatCliente 
+            WHERE id_Cliente = @id_Cliente
+        )
+        BEGIN
+            PRINT 'Cliente no existe';
+            RETURN;
+        END
+
+        -- 2. Validar productos inexistentes
+        IF EXISTS (
+            SELECT d.id_Producto
+            FROM @Detalle AS d
+            LEFT JOIN bdPracticas.dbo.CatProducto p
+                ON d.id_Producto = p.id_Producto
+            WHERE p.id_Producto IS NULL
+        )
+        BEGIN
+            PRINT 'Hay productos que no existen';
+            RETURN;
+        END
+
+        -- 3. Validar stock insuficiente
+        IF EXISTS (
+            SELECT 1
+            FROM @Detalle d
+            JOIN bdPracticas.dbo.CatProducto p
+                ON d.id_Producto = p.id_Producto
+            WHERE d.Cantidad_Vendida > p.Existencia
+        )
+        BEGIN
+            PRINT 'Stock insuficiente';
+            RETURN;
+        END
+
+        BEGIN TRANSACTION;
+
+        -- 4. Insertar venta
+        INSERT INTO bdPracticas.dbo.TblVenta (Fecha, id_Cliente)
+        VALUES (@FechaActual, @id_Cliente);
+
+        SET @id_Venta = SCOPE_IDENTITY();
+
+        -- 5. Insertar detalle
+        INSERT INTO bdPracticas.dbo.TblDetalleVenta
+        (id_Venta, id_Producto, precio_Venta, Cantidad_Vendida)
+        SELECT 
+            @id_Venta,
+            d.id_Producto,
+            p.Precio * d.Cantidad_Vendida,
+            d.Cantidad_Vendida
+        FROM @Detalle d
+        JOIN bdPracticas.dbo.CatProducto p
+            ON d.id_Producto = p.id_Producto;
+
+        -- 6. Actualizar stock
+        UPDATE p
+        SET p.Existencia = p.Existencia - d.Cantidad_Vendida
+        FROM bdPracticas.dbo.CatProducto p
+        JOIN @Detalle d
+            ON p.id_Producto = d.id_Producto;
+
+        COMMIT TRANSACTION;
+
+        PRINT 'Venta registrada correctamente';
+
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+
+        PRINT 'Error en la venta';
+    END CATCH
+END;
+GO
+
+-- EJECUCION: insertamos distintos productos con sus cantidades correspondientes por la tabla type
+DECLARE @Detalle Agregar_n_producto;
+
+INSERT INTO @Detalle VALUES (1, 2);
+INSERT INTO @Detalle VALUES (2, 3);
+INSERT INTO @Detalle VALUES (3, 1);
+
+EXEC usp_agregar_venta_multiple 'ANTON', @Detalle;
+
+
+-- Aqui podemos rectificar si el numero de existencias del producto es el mismo o no 
+SELECT * FROM bdPracticas.dbo.CatProducto
+WHERE id_Producto = 1;
+
+-- Aqui verificamos la venta si se actuaaliaz el id la fecha en que se hizo la venta y por quien 
+SELECT * FROM bdPracticas.dbo.TblVenta
+WHERE id_Cliente = 'ANTON';
+
+-- aqui verificamos el detalle de esa venta buscando por el id 
+SELECT * FROM bdPracticas.dbo.TblDetalleVenta
+WHERE id_Venta = 12258;
+
+-- Buscar id's
+SELECT id_Cliente FROM bdPracticas.dbo.CatCliente;
+SELECT * FROM bdPracticas.dbo.CatProducto;
+GO

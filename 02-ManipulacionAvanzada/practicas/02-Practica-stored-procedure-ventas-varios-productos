@@ -1,0 +1,126 @@
+--- Tabla tipo Type 
+CREATE TYPE Agregar_n_producto AS TABLE
+(
+    id_Producto INT,
+    Cantidad_Vendida INT
+);
+GO
+
+
+-- Store con la tabla type
+
+CREATE OR ALTER PROC usp_agregar_venta_multiple
+@id_Cliente NCHAR(5),
+@Detalle Agregar_n_producto READONLY
+AS
+BEGIN
+    DECLARE @id_Venta INT;
+    DECLARE @FechaActual DATE = CAST(GETDATE() AS DATE);
+
+    BEGIN TRY
+
+        --  1. Validar cliente
+        IF NOT EXISTS (
+            SELECT 1 
+            FROM bdPracticas.dbo.CatCliente 
+            WHERE id_Cliente = @id_Cliente
+        )
+        BEGIN
+            PRINT 'Cliente no existe';
+            RETURN;
+        END
+
+        -- 2. Validar productos inexistentes
+        IF EXISTS (
+            SELECT d.id_Producto
+            FROM @Detalle AS d
+            LEFT JOIN bdPracticas.dbo.CatProducto p
+                ON d.id_Producto = p.id_Producto
+            WHERE p.id_Producto IS NULL
+        )
+        BEGIN
+            PRINT 'Hay productos que no existen';
+            RETURN;
+        END
+
+        -- 3. Validar stock insuficiente
+        IF EXISTS (
+            SELECT 1
+            FROM @Detalle d
+            JOIN bdPracticas.dbo.CatProducto p
+                ON d.id_Producto = p.id_Producto
+            WHERE d.Cantidad_Vendida > p.Existencia
+        )
+        BEGIN
+            PRINT 'Stock insuficiente';
+            RETURN;
+        END
+
+        BEGIN TRANSACTION;
+
+        -- 4. Insertar venta
+        INSERT INTO bdPracticas.dbo.TblVenta (Fecha, id_Cliente)
+        VALUES (@FechaActual, @id_Cliente);
+
+        SET @id_Venta = SCOPE_IDENTITY();
+
+        -- 5. Insertar detalle
+        INSERT INTO bdPracticas.dbo.TblDetalleVenta
+        (id_Venta, id_Producto, precio_Venta, Cantidad_Vendida)
+        SELECT 
+            @id_Venta,
+            d.id_Producto,
+            p.Precio * d.Cantidad_Vendida,
+            d.Cantidad_Vendida
+        FROM @Detalle d
+        JOIN bdPracticas.dbo.CatProducto p
+            ON d.id_Producto = p.id_Producto;
+
+        -- 6. Actualizar stock
+        UPDATE p
+        SET p.Existencia = p.Existencia - d.Cantidad_Vendida
+        FROM bdPracticas.dbo.CatProducto p
+        JOIN @Detalle d
+            ON p.id_Producto = d.id_Producto;
+
+        COMMIT TRANSACTION;
+
+        PRINT 'Venta registrada correctamente';
+
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+
+        PRINT 'Error en la venta';
+    END CATCH
+END;
+GO
+
+
+-- EJECUCION: insertamos distintos productos con sus cantidades correspondientes por la tabla type
+DECLARE @Detalle Agregar_n_producto;
+
+INSERT INTO @Detalle VALUES (4, 2);
+INSERT INTO @Detalle VALUES (7, 3);
+INSERT INTO @Detalle VALUES (8, 1);
+
+EXEC usp_agregar_venta_multiple 'ANTON', @Detalle;
+
+
+-- Aqui podemos rectificar si el numero de existencias del producto es el mismo o no 
+SELECT * FROM bdPracticas.dbo.CatProducto
+WHERE id_Producto = 4;
+
+-- Aqui verificamos la venta si se actuaaliaz el id la fecha en que se hizo la venta y por quien 
+SELECT * FROM bdPracticas.dbo.TblVenta
+WHERE id_Cliente = 'ANTON';
+
+-- aqui verificamos el detalle de esa venta buscando por el id 
+SELECT * FROM bdPracticas.dbo.TblDetalleVenta
+WHERE id_Venta = 12259;
+
+-- Buscar id's
+SELECT id_Cliente FROM bdPracticas.dbo.CatCliente;
+SELECT * FROM bdPracticas.dbo.CatProducto;
+GO
